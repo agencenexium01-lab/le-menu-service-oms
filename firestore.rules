@@ -1,0 +1,161 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── HELPERS ──────────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function getUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isClient() {
+      return isAuth() && getUser().role == 'client';
+    }
+
+    function isChefPoint() {
+      return isAuth() && getUser().role == 'chef_point';
+    }
+
+    function isSuperAdmin() {
+      return isAuth() && getUser().role == 'super_admin';
+    }
+
+    function isStaff() {
+      return isChefPoint() || isSuperAdmin();
+    }
+
+    function isActiveUser() {
+      return isAuth() && getUser().active == true;
+    }
+
+    function isChefOfBranch(branchId) {
+      return isChefPoint() && getUser().branchId == branchId;
+    }
+
+    function canAccessBranch(branchId) {
+      return isSuperAdmin() || isChefOfBranch(branchId);
+    }
+
+    // ─── COLLECTION users ─────────────────────────────
+    match /users/{userId} {
+      // Un utilisateur peut lire son propre profil
+      allow read: if isAuth() && request.auth.uid == userId;
+      // Les staff peuvent lire tous les profils (pour les listes clients)
+      allow read: if isStaff() && isActiveUser();
+      // Permettre de lister/vérifier l'existence d'administrateurs (pour la sécurité d'initialisation de l'admin-setup)
+      allow list: if resource.data.role == 'admin';
+      // Un utilisateur peut mettre à jour son propre profil (champs limités)
+      allow update: if isAuth() && request.auth.uid == userId
+        && !('role' in request.resource.data)    // NE PEUT PAS changer son propre rôle
+        && !('branchId' in request.resource.data) // NE PEUT PAS changer sa branche
+        && !('active' in request.resource.data);  // NE PEUT PAS se réactiver
+      // Seul le super_admin peut créer/modifier des comptes staff
+      allow write: if isSuperAdmin() && isActiveUser();
+      // Création de compte client via inscription
+      allow create: if isAuth() && request.auth.uid == userId
+        && request.resource.data.role == 'client'; // Uniquement rôle client à la création
+    }
+
+    // ─── COLLECTION branches ──────────────────────────
+    match /branches/{branchId} {
+      // Tout le monde peut lire les branches (pour le formulaire de commande)
+      allow read: if true;
+      // Seul le super_admin peut modifier les branches
+      allow write: if isSuperAdmin() && isActiveUser();
+    }
+
+    // ─── COLLECTION orders ────────────────────────────
+    match /orders/{orderId} {
+      // Un client peut lire UNIQUEMENT ses propres commandes
+      allow read: if isAuth() && isActiveUser()
+        && (isClient() && resource.data.clientId == request.auth.uid
+          || canAccessBranch(resource.data.branchId));
+
+      // Un client peut créer une commande (avec son propre clientId)
+      allow create: if isClient() && isActiveUser()
+        && request.resource.data.clientId == request.auth.uid
+        && request.resource.data.status == 'nouveau'; // Statut initial forcé
+
+      // Mise à jour : client peut modifier UNIQUEMENT ses propres commandes et UNIQUEMENT certains champs
+      allow update: if isAuth() && isActiveUser() && (
+        // Chef de point peut modifier les commandes de son annexe
+        canAccessBranch(resource.data.branchId)
+        // Client peut modifier uniquement si statut 'nouveau' (avant traitement)
+        || (isClient() && resource.data.clientId == request.auth.uid
+            && resource.data.status == 'nouveau'
+            && !('status' in request.resource.data.diff(resource.data))) // ne peut pas changer le statut
+      );
+
+      // Suppression : super_admin uniquement
+      allow delete: if isSuperAdmin() && isActiveUser();
+
+      // ─── SOUS-COLLECTION history ─────────────────
+      match /history/{historyId} {
+        allow read: if isAuth() && isActiveUser() && (
+          isClient() && get(/databases/$(database)/documents/orders/$(orderId)).data.clientId == request.auth.uid
+          || canAccessBranch(get(/databases/$(database)/documents/orders/$(orderId)).data.branchId)
+        );
+        allow create: if isStaff() && isActiveUser()
+          && canAccessBranch(get(/databases/$(database)/documents/orders/$(orderId)).data.branchId);
+        allow update, delete: if false; // L'historique ne peut jamais être modifié
+      }
+    }
+
+    // ─── COLLECTION quotes ────────────────────────────
+    match /quotes/{quoteId} {
+      // Client peut lire SES devis uniquement
+      allow read: if isAuth() && isActiveUser() && (
+        (isClient() && resource.data.clientId == request.auth.uid)
+        || isStaff()
+      );
+      // Staff peut créer un devis
+      allow create: if isStaff() && isActiveUser();
+      // Client peut mettre à jour UNIQUEMENT le statut (accepter/refuser)
+      // Staff peut tout modifier
+      allow update: if isAuth() && isActiveUser() && (
+        isStaff()
+        || (isClient()
+            && resource.data.clientId == request.auth.uid
+            && resource.data.status == 'pending'
+            // Client ne peut modifier que status et clientComment
+            && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'clientComment', 'respondedAt']))
+      );
+      allow delete: if isSuperAdmin() && isActiveUser();
+    }
+
+    // ─── COLLECTION services ──────────────────────────
+    match /services/{serviceId} {
+      // Tout le monde peut lire les services (public pour formulaire)
+      allow read: if true;
+      // Seul super_admin peut modifier
+      allow write: if isSuperAdmin() && isActiveUser();
+    }
+
+    // ─── COLLECTION notifications ─────────────────────
+    match /notifications/{notifId} {
+      // Utilisateur voit uniquement SES notifications
+      allow read: if isAuth() && resource.data.userId == request.auth.uid;
+      // Staff peut créer des notifications
+      allow create: if isStaff() && isActiveUser();
+      // Utilisateur peut marquer comme lu (read = true uniquement)
+      allow update: if isAuth() && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isSuperAdmin() && isActiveUser();
+    }
+
+    // ─── COLLECTION settings ──────────────────────────
+    match /settings/{settingId} {
+      allow read: if isStaff() && isActiveUser();
+      allow write: if isSuperAdmin() && isActiveUser();
+    }
+
+    // ─── TOUT LE RESTE : REFUSÉ PAR DÉFAUT ───────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

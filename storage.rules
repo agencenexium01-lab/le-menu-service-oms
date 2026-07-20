@@ -1,0 +1,36 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isStaff() {
+      return getUserRole() in ['chef_point', 'super_admin'];
+    }
+
+    // ─── Fichiers des commandes ─────────────────────
+    // Path: orders/{userId}/{fileName}
+    match /orders/{userId}/{allPaths=**} {
+      // Upload : uniquement le client propriétaire du dossier
+      allow write: if isAuth()
+        && request.auth.uid == userId
+        && request.resource.size < 52428800  // Max 50 MB
+        && request.resource.contentType.matches('image/.*|application/pdf|application/postscript|image/vnd.adobe.photoshop');
+
+      // Lecture : le client propriétaire OU le staff
+      allow read: if isAuth()
+        && (request.auth.uid == userId || isStaff());
+    }
+
+    // ─── Tout le reste : refusé ─────────────────────
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

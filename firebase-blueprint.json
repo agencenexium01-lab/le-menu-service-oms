@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account details, separating admin employees from clients",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase user ID" },
+        "email": { "type": "string", "description": "User email address" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "role": { "type": "string", "enum": ["admin", "client"], "description": "Determines the user role" },
+        "phone": { "type": "string", "description": "User phone number" },
+        "companyName": { "type": "string", "description": "Optional business/company name" },
+        "createdAt": { "type": "object", "format": "timestamp", "description": "Timestamp when the document was created" }
+      },
+      "required": ["uid", "email", "displayName", "role", "phone", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Order records for print services",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Firestore document ID" },
+        "orderNumber": { "type": "string", "description": "Human-readable unique order number" },
+        "clientId": { "type": "string", "description": "ID of the client who placed the order" },
+        "clientName": { "type": "string", "description": "Name of the client" },
+        "clientEmail": { "type": "string", "description": "Email of the client" },
+        "serviceType": { "type": "string", "enum": ["bache", "panneau", "menu", "autocollant", "enseigne", "roll_up", "flyer", "autre"], "description": "Type of print service requested" },
+        "description": { "type": "string", "description": "Detailed description of the print specifications" },
+        "dimensions": { "type": "object", "description": "Width and height dimensions" },
+        "quantity": { "type": "integer", "description": "Quantity to print" },
+        "fileUrls": { "type": "array", "description": "Uploaded file URLs" },
+        "fileNames": { "type": "array", "description": "Names of uploaded files" },
+        "status": { "type": "string", "enum": ["nouveau", "en_verification", "devis_envoye", "devis_accepte", "en_production", "pret", "livre", "annule"], "description": "Current status of the order" },
+        "specialNote": { "type": "string", "description": "Optional client note" },
+        "adminNotes": { "type": "string", "description": "Optional admin note" },
+        "createdAt": { "type": "object", "format": "timestamp", "description": "Time the order was created" },
+        "updatedAt": { "type": "object", "format": "timestamp", "description": "Last update time" }
+      },
+      "required": ["orderNumber", "clientId", "clientName", "clientEmail", "serviceType", "description", "dimensions", "quantity", "fileUrls", "fileNames", "status", "createdAt", "updatedAt"]
+    },
+    "Quote": {
+      "title": "Quote",
+      "description": "Quotes proposed by admins/employees for a specific order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "adminId": { "type": "string" },
+        "amount": { "type": "number", "description": "Price/Amount proposed for the printing" },
+        "description": { "type": "string" },
+        "deliveryDays": { "type": "integer" },
+        "validUntil": { "type": "object", "format": "timestamp" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "refused"] },
+        "clientComment": { "type": "string" },
+        "createdAt": { "type": "object", "format": "timestamp" },
+        "respondedAt": { "type": "object", "format": "timestamp" }
+      },
+      "required": ["orderId", "clientId", "adminId", "amount", "description", "deliveryDays", "validUntil", "status", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notifications regarding quote/order statuses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["new_order", "quote_received", "quote_responded", "status_updated", "file_issue"] },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "orderId": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "object", "format": "timestamp" }
+      },
+      "required": ["userId", "type", "title", "message", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Store admin and client profiles"
+    },
+    "orders/{orderId}": {
+      "schema": "Order",
+      "description": "Store all print orders placed by clients"
+    },
+    "quotes/{quoteId}": {
+      "schema": "Quote",
+      "description": "Store devis/quotes sent to clients"
+    },
+    "notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Store targeted notifications for administrators and clients"
+    }
+  }
+}

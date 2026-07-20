@@ -1,0 +1,169 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-brand-pink: #E91E8C;
+  --color-brand-pink-dark: #C4166F;
+  --color-brand-pink-light: #FCE4F3;
+  --color-brand-cyan: #00B4D8;
+  --color-brand-cyan-dark: #0096B7;
+  --color-brand-cyan-light: #E0F7FC;
+  --color-brand-yellow: #F7C948;
+  --color-brand-yellow-light: #FFFBEB;
+  --color-brand-navy: #1A1A6E;
+  --color-brand-navy-light: #2D2D8E;
+  --color-brand-navy-pale: #EEF0FB;
+  --color-brand-bg: #F8FAFB;
+  --color-brand-surface: #FFFFFF;
+  --color-brand-border: #E5E7EB;
+  --color-brand-muted: #6B7280;
+  --color-brand-dark: #111827;
+
+  --font-sans: "DM Sans", sans-serif;
+  --font-display: "Plus Jakarta Sans", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-card-hover: 0 4px 12px rgba(233,30,140,0.12), 0 2px 6px rgba(0,0,0,0.08);
+  --shadow-pink:  0 4px 14px rgba(233,30,140,0.25);
+
+  --radius-card: 12px;
+  --radius-btn: 8px;
+}
+
+:root {
+  /* Palette de marque Le Menu Service */
+  --brand-pink:         #E91E8C;
+  --brand-pink-dark:    #C4166F;
+  --brand-pink-light:   #FCE4F3;
+  --brand-cyan:         #00B4D8;
+  --brand-cyan-dark:    #0096B7;
+  --brand-cyan-light:   #E0F7FC;
+  --brand-yellow:       #F7C948;
+  --brand-navy:         #1A1A6E;
+  --brand-navy-light:   #2D2D8E;
+  --brand-bg:           #F8FAFB;
+  --brand-surface:      #FFFFFF;
+  --brand-border:       #E5E7EB;
+  --brand-muted:         #6B7280;
+  --brand-dark:         #111827;
+
+  /* Mapping UI */
+  --primary:            var(--brand-pink);
+  --primary-hover:      var(--brand-pink-dark);
+  --secondary:          var(--brand-cyan);
+  --accent:             var(--brand-yellow);
+  --background:         var(--brand-bg);
+  --surface:            var(--brand-surface);
+  --text:               var(--brand-dark);
+  --text-muted:         var(--brand-muted);
+  --border:             var(--brand-border);
+}
+
+@layer base {
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background-color: var(--background);
+    color: var(--text);
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700;
+  }
+}
+
+@layer components {
+  /* Bouton principal — Rose Magenta */
+  .btn-primary {
+    @apply bg-brand-pink hover:bg-brand-pink-dark text-white font-semibold
+           px-5 py-2.5 rounded-btn transition-all duration-200
+           shadow-pink hover:shadow-lg active:scale-95;
+  }
+
+  /* Bouton secondaire — Contour Cyan */
+  .btn-secondary {
+    @apply border-2 border-brand-cyan text-brand-cyan hover:bg-brand-pink-light/30
+           font-semibold px-5 py-2.5 rounded-btn transition-all duration-200;
+  }
+
+  /* Bouton fantôme — Contour marine */
+  .btn-ghost {
+    @apply border border-brand-border text-brand-muted hover:bg-brand-navy-pale
+           font-medium px-5 py-2.5 rounded-btn transition-all duration-200;
+  }
+
+  /* Carte standard */
+  .card {
+    @apply bg-white rounded-card shadow-card border border-brand-border
+           transition-all duration-200 hover:shadow-card-hover;
+  }
+
+  /* Input de formulaire */
+  .input-field {
+    @apply w-full border border-brand-border rounded-btn px-4 py-2.5
+           text-brand-dark placeholder-brand-muted
+           focus:outline-none focus:ring-2 focus:ring-brand-pink
+           focus:border-brand-pink transition-all duration-200;
+  }
+
+  /* Badge statut — classe de base */
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold;
+  }
+}
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  /* Hide all interactive and outer workspace elements */
+  #sidebar, 
+  #navbar, 
+  header, 
+  footer, 
+  nav, 
+  button, 
+  a, 
+  .no-print, 
+  #mobile-chat-trigger, 
+  #mobile-chat-overlay,
+  #inactivity-logout-toast,
+  #global-online-offline-indicator,
+  .print-button,
+  .action-buttons,
+  .btn-primary,
+  .btn-secondary {
+    display: none !important;
+  }
+
+  /* Force clean and legible printable areas */
+  .printable-order-card,
+  #owner-dashboard-container,
+  [id^="client-order-detail-page-"] {
+    background: white !important;
+    border: 1px solid #cccccc !important;
+    color: black !important;
+    box-shadow: none !important;
+    padding: 20px !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 8px !important;
+  }
+
+  /* Ensure text is dark and visible on white page background */
+  .printable-order-card text,
+  .printable-order-card span,
+  .printable-order-card h1,
+  .printable-order-card h2,
+  .printable-order-card h3,
+  .printable-order-card h4,
+  .printable-order-card p,
+  .printable-order-card div {
+    color: black !important;
+  }
+}
