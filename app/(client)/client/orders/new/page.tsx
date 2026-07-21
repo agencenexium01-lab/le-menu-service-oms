@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import OrderForm from '../../../../../components/client/OrderForm';
-import { askOrderGuide } from '../../../../../lib/gemini/client';
+import { askOrderGuideStream } from '../../../../../lib/gemini/client';
 import { Order } from '../../../../../types';
 import { 
   MessageSquare, 
@@ -23,10 +23,10 @@ export default function ClientNewOrderPage() {
   const [userMessageCount, setUserMessageCount] = useState(0);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages and stream updates
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isMobileDrawerOpen]);
+  }, [messages, isMobileDrawerOpen, loading]);
 
   // Query DOM in real time to capture active input values
   const grabCurrentFormData = (): Partial<Order> => {
@@ -44,7 +44,7 @@ export default function ClientNewOrderPage() {
       const unit = unitButton ? (unitButton.textContent?.trim().toLowerCase() === 'cm' ? 'cm' : 'm') : 'm';
 
       return {
-        serviceType: select?.value as any || 'bache',
+        serviceType: (select?.value as any) || 'bache',
         quantity: qtyInput ? parseInt(qtyInput.value) || 1 : 1,
         dimensions: {
           width: widthInput ? parseFloat(widthInput.value) || 0 : 0,
@@ -70,26 +70,52 @@ export default function ClientNewOrderPage() {
 
     const currentMsg = input.trim();
     setInput('');
-    
-    const updatedMessages = [...messages, { sender: 'user' as const, text: currentMsg }];
-    setMessages(updatedMessages);
+
+    // 1. Ajouter le message de l'utilisateur et préparer la bulle vide pour l'assistant
+    setMessages(prev => [
+      ...prev,
+      { sender: 'user', text: currentMsg },
+      { sender: 'assistant', text: '' }
+    ]);
     setUserMessageCount(prev => prev + 1);
     setLoading(true);
 
     try {
       const currentFormData = grabCurrentFormData();
-      const reply = await askOrderGuide(currentMsg, currentFormData);
-      
-      setMessages(prev => [...prev, { sender: 'assistant' as const, text: reply }]);
+      // 2. Appel du générateur de streaming Gemini
+      const stream = askOrderGuideStream(currentMsg, currentFormData);
+
+      for await (const chunk of stream) {
+        // Dès qu'on reçoit le premier morceau de texte, on masque le spinner
+        setLoading(false);
+
+        // 3. Injecter les morceaux de texte au fur et à mesure dans la dernière bulle
+        setMessages(prevMessages => {
+          const updated = [...prevMessages];
+          const lastIndex = updated.length - 1;
+          if (lastIndex >= 0 && updated[lastIndex].sender === 'assistant') {
+            updated[lastIndex] = {
+              ...updated[lastIndex],
+              text: updated[lastIndex].text + chunk
+            };
+          }
+          return updated;
+        });
+      }
     } catch (err: any) {
       console.error(err);
-      setMessages(prev => [
-        ...prev, 
-        { 
-          sender: 'assistant' as const, 
-          text: "Je suis spécialisé dans l'aide aux commandes d'impression. Pour toute autre question, contactez-nous directement." 
+      setLoading(false);
+      setMessages(prev => {
+        const updated = [...prev];
+        const lastIndex = updated.length - 1;
+        if (lastIndex >= 0 && updated[lastIndex].sender === 'assistant') {
+          // En cas d'erreur, mettre un message de secours si la réponse est vide
+          if (!updated[lastIndex].text) {
+            updated[lastIndex].text = "Je suis spécialisé dans l'aide aux commandes d'impression. Pour toute autre question, contactez-nous directement.";
+          }
         }
-      ]);
+        return updated;
+      });
     } finally {
       setLoading(false);
     }
@@ -122,29 +148,37 @@ export default function ClientNewOrderPage() {
 
       {/* Message history layout */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
-        {messages.map((msg, idx) => (
-          <div key={idx} className={`flex items-start gap-2 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-            {msg.sender === 'assistant' ? (
-              <div className="w-6 h-6 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center shrink-0 mt-0.5 border border-emerald-200 text-[9px] font-bold">
-                LM
-              </div>
-            ) : (
-              <div className="w-6 h-6 bg-slate-200 text-slate-700 rounded-lg flex items-center justify-center shrink-0 mt-0.5 border border-slate-300 text-[9px] font-bold">
-                US
-              </div>
-            )}
-            
-            <div className={`p-3 rounded-2xl text-[12px] leading-relaxed font-medium max-w-[80%] shadow-sm ${
-              msg.sender === 'user'
-                ? 'bg-emerald-600 text-white rounded-tr-none'
-                : 'bg-white text-slate-800 rounded-tl-none border border-slate-200'
-            }`}>
-              {msg.text}
-            </div>
-          </div>
-        ))}
+        {messages.map((msg, idx) => {
+          // Ne pas afficher une bulle vide si elle est encore en train de charger le premier chunk
+          if (msg.sender === 'assistant' && msg.text === '' && loading) {
+            return null;
+          }
 
-        {loading && (
+          return (
+            <div key={idx} className={`flex items-start gap-2 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+              {msg.sender === 'assistant' ? (
+                <div className="w-6 h-6 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center shrink-0 mt-0.5 border border-emerald-200 text-[9px] font-bold">
+                  LM
+                </div>
+              ) : (
+                <div className="w-6 h-6 bg-slate-200 text-slate-700 rounded-lg flex items-center justify-center shrink-0 mt-0.5 border border-slate-300 text-[9px] font-bold">
+                  US
+                </div>
+              )}
+              
+              <div className={`p-3 rounded-2xl text-[12px] leading-relaxed font-medium max-w-[80%] shadow-sm whitespace-pre-wrap ${
+                msg.sender === 'user'
+                  ? 'bg-emerald-600 text-white rounded-tr-none'
+                  : 'bg-white text-slate-800 rounded-tl-none border border-slate-200'
+              }`}>
+                {msg.text}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Indicateur de réflexion initial avant le premier chunk */}
+        {loading && messages[messages.length - 1]?.text === '' && (
           <div className="flex items-start gap-2 animate-pulse">
             <div className="w-6 h-6 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center shrink-0 mt-0.5 border border-emerald-200 text-[9px] font-bold">
               LM
