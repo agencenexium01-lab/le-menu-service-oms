@@ -21,6 +21,7 @@ import {
   ArrowRight, 
   Award, 
   CheckCircle,
+  MessageCircle,
   HelpCircle,
   Users,
   Layers,
