@@ -281,12 +281,14 @@ export default function LandingPage() {
                   </p>
                   <div className="flex gap-4 pt-1">
                     <a 
-                      href="tel:+2290196100789" 
-                      className="inline-flex items-center gap-2 text-xs font-bold bg-brand-pink hover:bg-brand-pink-dark text-white px-5 py-3 rounded-xl transition-all shadow-pink"
-                    >
-                      <Phone className="w-3.5 h-3.5" />
-                      <span>S'inscrire (WhatsApp / Tél)</span>
-                    </a>
+  href="https://wa.me/2290196100789?text=Bonjour,%20je%20souhaite%20m'inscrire%20%C3%A0%20une%20formation." 
+  target="_blank" 
+  rel="noopener noreferrer" 
+  className="inline-flex items-center gap-2 text-xs font-bold bg-brand-pink hover:bg-brand-pink-dark text-white px-5 py-3 rounded-xl transition-all shadow-pink cursor-pointer"
+>
+  <MessageCircle className="w-3.5 h-3.5" />
+  <span>S'inscrire (WhatsApp)</span>
+</a>
                   </div>
                 </div>
 
